@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Statistiche Editori – Agenzia Martorana</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --blu: #1F4E78;
+    --blu-light: #2E6DAA;
+    --bg: #f0f4f8;
+    --card: #ffffff;
+    --pos: #1a7a3a;
+    --pos-bg: #e6f4ec;
+    --neg: #c0392b;
+    --neg-bg: #fdecea;
+    --zero: #666;
+    --zero-bg: #f5f5f5;
+    --border: #dce3ea;
+    --text: #1a1a2e;
+    --note: #e67e22;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+  header {
+    background: linear-gradient(135deg, var(--blu) 0%, var(--blu-light) 100%);
+    color: white;
+    padding: 20px 16px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(31,78,120,0.25);
+  }
+  header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.3px; margin-bottom: 4px; }
+  header p { font-size: 0.78rem; opacity: 0.82; }
+  .tabs {
+    display: flex;
+    background: var(--blu);
+    padding: 0 16px;
+    gap: 4px;
+    border-top: 1px solid rgba(255,255,255,0.15);
+  }
+  .tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.65);
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 10px 0;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    letter-spacing: 0.4px;
+  }
+  .tab-btn.active { color: white; border-bottom-color: #FFD700; }
+  .tab-content { display: none; padding: 16px; }
+  .tab-content.active { display: block; }
+  .section-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--blu);
+    margin: 18px 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .totale-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+  .totale-card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 14px 12px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .totale-card .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.8px; color: #888; font-weight: 600; }
+  .totale-card .value { font-size: 1.45rem; font-weight: 800; line-height: 1; }
+  .totale-card .sublabel { font-size: 0.65rem; color: #aaa; }
+  .pos { color: var(--pos); }
+  .neg { color: var(--neg); }
+  .table-wrapper {
+    background: var(--card);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    margin-bottom: 14px;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: var(--blu); }
+  thead th { color: white; font-size: 0.72rem; font-weight: 700; padding: 11px 10px; text-align: left; letter-spacing: 0.4px; white-space: nowrap; }
+  thead th:last-child { text-align: right; }
+  thead th.center { text-align: center; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #f7f9fc; }
+  tbody tr.totale-row { background: #eef3f9; border-top: 2px solid var(--blu); }
+  tbody tr.totale-row td { font-weight: 700; color: var(--blu); }
+  td { padding: 10px 10px; font-size: 0.82rem; vertical-align: middle; }
+  td.editore { font-weight: 600; font-size: 0.8rem; color: var(--text); }
+  td.valore { text-align: right; font-size: 0.88rem; font-weight: 700; white-space: nowrap; }
+  .badge { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 20px; font-size: 0.82rem; font-weight: 700; }
+  .badge.pos { background: var(--pos-bg); color: var(--pos); }
+  .badge.neg { background: var(--neg-bg); color: var(--neg); }
+  .badge.zero { background: var(--zero-bg); color: var(--zero); }
+  .note-tag { display: inline-block; background: #fff3e0; color: var(--note); border: 1px solid #f5c07a; border-radius: 6px; font-size: 0.65rem; font-weight: 600; padding: 2px 6px; line-height: 1.4; margin-top: 3px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 18px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.72rem; color: #666; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .legend-dot.pos { background: var(--pos); }
+  .legend-dot.neg { background: var(--neg); }
+  .legend-dot.zero { background: #bbb; }
+
+  /* CHART PIE */
+  .chart-card {
+    background: var(--card);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    padding: 16px 12px 12px;
+    margin-bottom: 14px;
+  }
+  .pie-subtitle {
+    text-align: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--blu);
+    margin-bottom: 10px;
+  }
+  .pie-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .pie-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .pie-wrap canvas {
+    max-width: 160px;
+    width: 100% !important;
+    height: auto !important;
+  }
+  .pie-summary {
+    margin-top: 8px;
+    width: 100%;
+  }
+  .pie-summary-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.68rem;
+    color: #444;
+    margin-bottom: 3px;
+  }
+  .pie-summary-item .dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .pie-summary-item .name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+  }
+  .pie-summary-item .val {
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .chart-note { font-size: 0.63rem; color: #aaa; text-align: center; margin-top: 10px; }
+
+  footer { text-align: center; font-size: 0.68rem; color: #aaa; margin-top: 24px; padding: 0 16px; }
+
+  @media (min-width: 600px) {
+    .tab-content { padding: 20px 24px; }
+    td, thead th { padding: 12px 14px; }
+    td { font-size: 0.88rem; }
+    thead th { font-size: 0.78rem; }
+    td.editore { font-size: 0.86rem; }
+    .pie-wrap canvas { max-width: 200px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>&#128202; Statistiche Editori &#8211; Agenzia Martorana</h1>
+  <p>Variazioni percentuali per editore &middot; SS1 e SS2</p>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="showTab('martorana', this)">MARTORANA LIBRI</button>
+  <button class="tab-btn" onclick="showTab('mb', this)">MB MULTIMEDIABOOK</button>
+</div>
+
+<!-- ===== TAB MARTORANA ===== -->
+<div id="tab-martorana" class="tab-content active">
+
+  <div class="section-title">Riepilogo Totali</div>
+  <div class="totale-grid">
+    <div class="totale-card">
+      <span class="label">Totale SS1</span>
+      <span class="value neg">-2,29%</span>
+      <span class="sublabel">Scuola Secondaria I&deg;</span>
+    </div>
+    <div class="totale-card">
+      <span class="label">Totale SS2</span>
+      <span class="value pos">+0,12%</span>
+      <span class="sublabel">Scuola Secondaria II&deg;</span>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot pos"></span> Incremento</div>
+    <div class="legend-item"><span class="legend-dot neg"></span> Decremento</div>
+    <div class="legend-item"><span class="legend-dot zero"></span> Invariato / non significativo</div>
+  </div>
+
+  <!-- GRAFICI A TORTA MARTORANA -->
+  <div class="section-title">Distribuzione Variazioni</div>
+  <div class="chart-card">
+    <div class="pie-grid">
+      <div class="pie-wrap">
+        <div class="pie-subtitle">SS1</div>
+        <canvas id="pieM_SS1"></canvas>
+        <div class="pie-summary" id="summaryM_SS1"></div>
+      </div>
+      <div class="pie-wrap">
+        <div class="pie-subtitle">SS2</div>
+        <canvas id="pieM_SS2"></canvas>
+        <div class="pie-summary" id="summaryM_SS2"></div>
+      </div>
+    </div>
+    <p class="chart-note">Le fette mostrano il peso assoluto di ogni editore sul totale delle variazioni. Verde = incremento &bull; Rosso = decremento &bull; Grigio = invariato</p>
+  </div>
+
+  <div class="section-title">Dettaglio Editori SS1</div>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>Editore</th><th class="center">Variazione</th></tr></thead>
+      <tbody>
+        <tr><td class="editore">Petrini</td><td class="valore"><span class="badge pos">&#9650; +0,50%</span></td></tr>
+        <tr><td class="editore">Garzanti</td><td class="valore"><span class="badge neg">&#9660; -0,25%</span></td></tr>
+        <tr><td class="editore">Liviana</td><td class="valore"><span class="badge zero">&mdash; 0,00%</span></td></tr>
+        <tr><td class="editore">Cideb</td><td class="valore"><span class="badge neg">&#9660; -0,23%</span></td></tr>
+        <tr><td class="editore">Lattes</td><td class="valore"><span class="badge neg">&#9660; -1,73%</span></td></tr>
+        <tr><td class="editore">Ghisetti &amp; Corvi</td><td class="valore"><span class="badge zero">&mdash; 0,00%</span></td></tr>
+        <tr><td class="editore">Cedam</td><td class="valore"><span class="badge zero">&mdash; 0,00%</span></td></tr>
+        <tr><td class="editore">DeaScuola<br><span class="note-tag">&#9888; Condominio Litrico</span></td><td class="valore"><span class="badge neg">&#9660; -1,12%</span></td></tr>
+        <tr><td class="editore">Marietti<br><span class="note-tag">&#9888; Condominio Litrico</span></td><td class="valore"><span class="badge neg">&#9660; -0,05%</span></td></tr>
+        <tr><td class="editore">Valmartina</td><td class="valore"><span class="badge zero">&mdash; 0,00%</span></td></tr>
+        <tr><td class="editore">La Scuola</td><td class="valore"><span class="badge pos">&#9650; +0,43%</span></td></tr>
+        <tr><td class="editore">SEI</td><td class="valore"><span class="badge neg">&#9660; -0,31%</span></td></tr>
+        <tr><td class="editore">Hachette</td><td class="valore"><span class="badge neg">&#9660; -0,01%</span></td></tr>
+        <tr><td class="editore">Il Capitello</td><td class="valore"><span class="badge pos">&#9650; +0,51%</span></td></tr>
+        <tr><td class="editore">Trinity Whitebridge</td><td class="valore"><span class="badge zero">&mdash; 0,00%</span></td></tr>
+        <tr><td class="editore">Cappelli</td><td class="valore"><span class="badge zero">&mdash; 0,00%</span></td></tr>
+        <tr><td class="editore">Reda</td><td class="valore"><span class="badge zero">&mdash; 0,00%</span></td></tr>
+        <tr><td class="editore">San Marco</td><td class="valore"><span class="badge zero">&mdash; 0,00%</span></td></tr>
+        <tr><td class="editore">Laterza</td><td class="valore"><span class="badge zero">&mdash; 0,00%</span></td></tr>
+        <tr><td class="editore">Palumbo</td><td class="valore"><span class="badge neg">&#9660; -0,03%</span></td></tr>
+        <tr class="totale-row"><td class="editore">TOTALE</td><td class="valore"><span class="badge neg">&#9660; -2,29%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-title">Dettaglio Editori SS2</div>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>Editore</th><th class="center">Variazione</th></tr></thead>
+      <tbody>
+        <tr><td class="editore">Petrini</td><td class="valore"><span class="badge neg">&#9660; -0,04%</span></td></tr>
+        <tr><td class="editore">Garzanti</td><td class="valore"><span class="badge pos">&#9650; +0,07%</span></td></tr>
+        <tr><td class="editore">Liviana</td><td class="valore"><span class="badge pos">&#9650; +0,04%</span></td></tr>
+        <tr><td class="editore">Cideb</td><td class="valore"><span class="badge neg">&#9660; -0,33%</span></td></tr>
+        <tr><td class="editore">Lattes</td><td class="valore"><span class="badge neg">&#9660; -0,06%</span></td></tr>
+        <tr><td class="editore">Ghisetti &amp; Corvi</td><td class="valore"><span class="badge neg">&#9660; -0,07%</span></td></tr>
+        <tr><td class="editore">Cedam</td><td class="valore"><span class="badge pos">&#9650; +0,02%</span></td></tr>
+        <tr><td class="editore">DeaScuola<br><span class="note-tag">&#9888; Condominio Litrico</span></td><td class="valore"><span class="badge neg">&#9660; -0,19%</span></td></tr>
+        <tr><td class="editore">Marietti<br><span class="note-tag">&#9888; Condominio Litrico</span></td><td class="valore"><span class="badge pos">&#9650; +0,42%</span></td></tr>
+        <tr><td class="editore">Valmartina</td><td class="valore"><span class="badge pos">&#9650; +0,03%</span></td></tr>
+        <tr><td class="editore">La Scuola</td><td class="valore"><span class="badge neg">&#9660; -0,09%</span></td></tr>
+        <tr><td class="editore">SEI</td><td class="valore"><span class="badge neg">&#9660; -0,02%</span></td></tr>
+        <tr><td class="editore">Hachette</td><td class="valore"><span class="badge neg">&#9660; -0,03%</span></td></tr>
+        <tr><td class="editore">Il Capitello</td><td class="valore"><span class="badge pos">&#9650; +0,06%</span></td></tr>
+        <tr><td class="editore">Trinity Whitebridge</td><td class="valore"><span class="badge pos">&#9650; +0,03%</span></td></tr>
+        <tr><td class="editore">Cappelli</td><td class="valore"><span class="badge pos">&#9650; +0,02%</span></td></tr>
+        <tr><td class="editore">Reda</td><td class="valore"><span class="badge neg">&#9660; -0,03%</span></td></tr>
+        <tr><td class="editore">San Marco</td><td class="valore"><span class="badge pos">&#9650; +0,07%</span></td></tr>
+        <tr><td class="editore">Laterza</td><td class="valore"><span class="badge pos">&#9650; +0,19%</span></td></tr>
+        <tr><td class="editore">Palumbo</td><td class="valore"><span class="badge pos">&#9650; +0,03%</span></td></tr>
+        <tr class="totale-row"><td class="editore">TOTALE</td><td class="valore"><span class="badge pos">&#9650; +0,12%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- ===== TAB MB ===== -->
+<div id="tab-mb" class="tab-content">
+
+  <div class="section-title">Riepilogo Totali</div>
+  <div class="totale-grid">
+    <div class="totale-card">
+      <span class="label">Totale SS1</span>
+      <span class="value pos">+0,28%</span>
+      <span class="sublabel">Scuola Secondaria I&deg;</span>
+    </div>
+    <div class="totale-card">
+      <span class="label">Totale SS2</span>
+      <span class="value pos">+1,11%</span>
+      <span class="sublabel">Scuola Secondaria II&deg;</span>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot pos"></span> Incremento</div>
+    <div class="legend-item"><span class="legend-dot neg"></span> Decremento</div>
+    <div class="legend-item"><span class="legend-dot zero"></span> Invariato / non significativo</div>
+  </div>
+
+  <!-- GRAFICI A TORTA MB -->
+  <div class="section-title">Distribuzione Variazioni</div>
+  <div class="chart-card">
+    <div class="pie-grid">
+      <div class="pie-wrap">
+        <div class="pie-subtitle">SS1</div>
+        <canvas id="pieMB_SS1"></canvas>
+        <div class="pie-summary" id="summaryMB_SS1"></div>
+      </div>
+      <div class="pie-wrap">
+        <div class="pie-subtitle">SS2</div>
+        <canvas id="pieMB_SS2"></canvas>
+        <div class="pie-summary" id="summaryMB_SS2"></div>
+      </div>
+    </div>
+    <p class="chart-note">Le fette mostrano il peso assoluto di ogni editore sul totale delle variazioni. Verde = incremento &bull; Rosso = decremento &bull; Grigio = invariato</p>
+  </div>
+
+  <div class="section-title">Dettaglio Editori SS1</div>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>Editore</th><th class="center">Variazione</th></tr></thead>
+      <tbody>
+        <tr><td class="editore">B. Mondadori</td><td class="valore"><span class="badge neg">&#9660; -0,18%</span></td></tr>
+        <tr><td class="editore">Paravia</td><td class="valore"><span class="badge pos">&#9650; +0,54%</span></td></tr>
+        <tr><td class="editore">Lang</td><td class="valore"><span class="badge neg">&#9660; -0,21%</span></td></tr>
+        <tr><td class="editore">Linx</td><td class="valore"><span class="badge zero">&mdash; 0,00%</span></td></tr>
+        <tr><td class="editore">Longman</td><td class="valore"><span class="badge pos">&#9650; +0,25%</span></td></tr>
+        <tr><td class="editore">Pearson Science</td><td class="valore"><span class="badge neg">&#9660; -0,12%</span></td></tr>
+        <tr><td class="editore">Pearson</td><td class="valore"><span class="badge zero">&mdash; 0,00%</span></td></tr>
+        <tr><td class="editore">Paramond</td><td class="valore"><span class="badge zero">&mdash; 0,00%</span></td></tr>
+        <tr class="totale-row"><td class="editore">TOTALE</td><td class="valore"><span class="badge pos">&#9650; +0,28%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-title">Dettaglio Editori SS2</div>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>Editore</th><th class="center">Variazione</th></tr></thead>
+      <tbody>
+        <tr><td class="editore">B. Mondadori</td><td class="valore"><span class="badge pos">&#9650; +0,28%</span></td></tr>
+        <tr><td class="editore">Paravia</td><td class="valore"><span class="badge pos">&#9650; +0,38%</span></td></tr>
+        <tr><td class="editore">Lang</td><td class="valore"><span class="badge pos">&#9650; +0,06%</span></td></tr>
+        <tr><td class="editore">Linx</td><td class="valore"><span class="badge zero">&mdash; 0,00%</span></td></tr>
+        <tr><td class="editore">Longman</td><td class="valore"><span class="badge pos">&#9650; +0,21%</span></td></tr>
+        <tr><td class="editore">Pearson Science</td><td class="valore"><span class="badge neg">&#9660; -0,03%</span></td></tr>
+        <tr><td class="editore">Pearson</td><td class="valore"><span class="badge neg">&#9660; -0,01%</span></td></tr>
+        <tr><td class="editore">Paramond</td><td class="valore"><span class="badge pos">&#9650; +0,22%</span></td></tr>
+        <tr class="totale-row"><td class="editore">TOTALE</td><td class="valore"><span class="badge pos">&#9650; +1,11%</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<footer>
+  Agenzia Martorana Libri SRL &middot; MB Multimediabook's SRL<br>
+  Dati elaborati da STATISTICHE_EDITORI_SINGOLI_AGENZIA_MARTORANA.xlsx
+</footer>
+
+<script>
+function showTab(id, btn) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// Palette colori: verde per positivi, rosso per negativi, grigio per zero
+// Generiamo sfumature distinte per editori dello stesso segno
+const GREENS = ['#1a7a3a','#27ae60','#2ecc71','#52d99a','#82e0aa','#a9dfbf'];
+const REDS   = ['#c0392b','#e74c3c','#ec7063','#f1948a','#f5b7b1','#d98880'];
+const GRAYS  = ['#aaa','#bbb','#ccc','#ddd'];
+
+function assignColors(data) {
+  let gi=0, ri=0, zi=0;
+  return data.map(d => {
+    if (d.v > 0)  return GREENS[gi++ % GREENS.length];
+    if (d.v < 0)  return REDS[ri++ % REDS.length];
+    return GRAYS[zi++ % GRAYS.length];
+  });
+}
+
+function makePie(canvasId, summaryId, rawData) {
+  // rawData = [{label, v}] — v è il valore originale (può essere negativo)
+  // Per la torta usiamo i valori assoluti come "peso"
+  const data = rawData.map(d => ({ label: d.label, v: d.v, abs: Math.abs(d.v) === 0 ? 0.0001 : Math.abs(d.v) }));
+  const colors = assignColors(rawData);
+  const ctx = document.getElementById(canvasId).getContext('2d');
+
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: data.map(d => d.label),
+      datasets: [{
+        data: data.map(d => d.abs),
+        backgroundColor: colors,
+        borderColor: '#fff',
+        borderWidth: 2,
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      cutout: '52%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const idx = ctx.dataIndex;
+              const v = rawData[idx].v;
+              return ' ' + ctx.label + ': ' + (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // Mini legenda testuale sotto la torta
+  const sumEl = document.getElementById(summaryId);
+  rawData.forEach((d, i) => {
+    const row = document.createElement('div');
+    row.className = 'pie-summary-item';
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.background = colors[i];
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.title = d.label;
+    name.textContent = d.label;
+    const val = document.createElement('span');
+    val.className = 'val';
+    val.style.color = d.v > 0 ? '#1a7a3a' : d.v < 0 ? '#c0392b' : '#888';
+    val.textContent = (d.v >= 0 ? '+' : '') + (d.v * 100).toFixed(2) + '%';
+    row.appendChild(dot); row.appendChild(name); row.appendChild(val);
+    sumEl.appendChild(row);
+  });
+}
+
+// ---- DATI ----
+
+const mSS1 = [
+  {label:'Petrini', v:0.005}, {label:'Garzanti', v:-0.0025}, {label:'Liviana', v:0},
+  {label:'Cideb', v:-0.0023}, {label:'Lattes', v:-0.0173}, {label:'Ghisetti & Corvi', v:0},
+  {label:'Cedam', v:0}, {label:'DeaScuola', v:-0.0112}, {label:'Marietti', v:-0.0005},
+  {label:'Valmartina', v:0}, {label:'La Scuola', v:0.0043}, {label:'SEI', v:-0.0031},
+  {label:'Hachette', v:-0.0001}, {label:'Il Capitello', v:0.0051}, {label:'Trinity W.', v:0},
+  {label:'Cappelli', v:0}, {label:'Reda', v:0}, {label:'San Marco', v:0},
+  {label:'Laterza', v:0}, {label:'Palumbo', v:-0.0003}
+];
+
+const mSS2 = [
+  {label:'Petrini', v:-0.0004}, {label:'Garzanti', v:0.0007}, {label:'Liviana', v:0.0004},
+  {label:'Cideb', v:-0.0033}, {label:'Lattes', v:-0.0006}, {label:'Ghisetti & Corvi', v:-0.0007},
+  {label:'Cedam', v:0.0002}, {label:'DeaScuola', v:-0.0019}, {label:'Marietti', v:0.0042},
+  {label:'Valmartina', v:0.0003}, {label:'La Scuola', v:-0.0009}, {label:'SEI', v:-0.0002},
+  {label:'Hachette', v:-0.0003}, {label:'Il Capitello', v:0.0006}, {label:'Trinity W.', v:0.0003},
+  {label:'Cappelli', v:0.0002}, {label:'Reda', v:-0.0003}, {label:'San Marco', v:0.0007},
+  {label:'Laterza', v:0.0019}, {label:'Palumbo', v:0.0003}
+];
+
+const mbSS1 = [
+  {label:'B. Mondadori', v:-0.0018}, {label:'Paravia', v:0.0054}, {label:'Lang', v:-0.0021},
+  {label:'Linx', v:0}, {label:'Longman', v:0.0025}, {label:'Pearson Sci.', v:-0.0012},
+  {label:'Pearson', v:0}, {label:'Paramond', v:0}
+];
+
+const mbSS2 = [
+  {label:'B. Mondadori', v:0.0028}, {label:'Paravia', v:0.0038}, {label:'Lang', v:0.0006},
+  {label:'Linx', v:0}, {label:'Longman', v:0.0021}, {label:'Pearson Sci.', v:-0.0003},
+  {label:'Pearson', v:-0.0001}, {label:'Paramond', v:0.0022}
+];
+
+window.addEventListener('load', () => {
+  makePie('pieM_SS1',  'summaryM_SS1',  mSS1);
+  makePie('pieM_SS2',  'summaryM_SS2',  mSS2);
+  makePie('pieMB_SS1', 'summaryMB_SS1', mbSS1);
+  makePie('pieMB_SS2', 'summaryMB_SS2', mbSS2);
+});
+</script>
+
+</body>
+</html>
